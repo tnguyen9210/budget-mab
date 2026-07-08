@@ -42,10 +42,14 @@ measured against (`regret = oracle_reward() - algo.run(env)`).
 All five share the same `run(env) -> total_reward` interface
 (`src/algorithms.py:1-8`) and follow the same overall shape: an
 initial round-robin phase (pull each arm once), then a selection rule
-that runs until the budget is exhausted. **This shared shape is
-currently duplicated by hand across the KUBE/FractionalKUBE/UCB1
-classes rather than factored into a common base** — see
-[issues.md#duplicated-run-skeleton](issues.md#duplicated-run-skeleton).
+that runs until the budget is exhausted. The UCB formula, the
+"find cheapest feasible arm" fallback, and the incremental mean
+update are factored into shared helpers
+(`ucb_values`, `cheapest_feasible_arm`, `update_mean`,
+`src/algorithms.py:19-40`) used by all four UCB-based classes — see
+[issues.md#duplicated-run-skeleton](issues.md#duplicated-run-skeleton)
+for what's still duplicated (each class's own `while` loop/phase
+structure) and why.
 
 ### KUBE (Algorithm 1 in the paper)
 
@@ -56,25 +60,27 @@ then samples one arm from the resulting allocation with probability
 proportional to how many "units" of it the knapsack fit. The
 knapsack step is itself cost-aware, so by construction it never
 proposes an arm the residual budget can't afford — the post-hoc
-"arm not affordable" fallback (`src/algorithms.py:91-98`) is
-genuinely defensive here, not a routinely-hit path.
+"arm not affordable" fallback (`cheapest_feasible_arm`, called from
+`src/algorithms.py:123`) is genuinely defensive here, not a
+routinely-hit path.
 
 ### Fractional KUBE (paper §3.3)
 
 The cheaper O(K) relaxation of KUBE: instead of solving the knapsack,
-deterministically pick the single arm with highest UCB-density. This
-selection is **not** restricted to affordable arms before the argmax,
-unlike UCB1 — see
+deterministically pick the arm with the highest UCB-density **among
+currently-affordable arms** (restricted before the argmax, matching
+UCB1's pattern — see
 [issues.md#fractional-kube-fallback-discards-ranking](issues.md#fractional-kube-fallback-discards-ranking)
-for why this matters near budget exhaustion.
+for the earlier version that argmaxed over all arms first and why
+that discarded ranking information near budget exhaustion).
 
 ### UCB1 (budget-unaware baseline, budget-aware selection)
 
 Standard UCB1 index, but arm selection is restricted to the
 currently-affordable subset before taking the argmax
-(`src/algorithms.py:186-188`) — this is what makes UCB1's own
-"unaffordable" fallback essentially unreachable in normal operation,
-unlike Fractional KUBE's.
+(`src/algorithms.py:221`) — this is what makes UCB1's own
+"unaffordable" fallback essentially unreachable in normal operation
+(and the pattern Fractional KUBE's fix now follows too).
 
 ### Random
 
@@ -86,9 +92,11 @@ possible baseline; no UCB bookkeeping.
 Two phases: round-robin exploration until `eps*budget` is spent,
 then exploit the empirically-best arm (by `mu_hat/cost` density) for
 the remaining budget. This is structurally different from the other
-four (two phases instead of one selection rule run to exhaustion),
-and its phase-boundary handling has a real gap — see
-[issues.md#epsilon-first-exploration-early-break](issues.md#epsilon-first-exploration-early-break).
+four (two phases instead of one selection rule run to exhaustion).
+The exploration phase falls back to the cheapest affordable arm when
+the round-robin arm is unaffordable, same as the other three — see
+[issues.md#epsilon-first-exploration-early-break](issues.md#epsilon-first-exploration-early-break)
+for the earlier version that broke out of exploration early instead.
 
 ## Experiment pipeline
 

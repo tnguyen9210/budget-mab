@@ -8,15 +8,26 @@ resolve before fixing.
 
 Status legend: **confirmed** (verified against the code with a
 concrete reachable scenario) / **plausible** (real defect, but
-severity or reachability not fully pinned down).
+severity or reachability not fully pinned down) / **fixed** (patched,
+re-verified after the fix).
 
 ---
 
 ## Epsilon-first exploration early break {#epsilon-first-exploration-early-break}
 
-**Status:** confirmed · **File:** `src/algorithms.py:258` ·
+**Status:** fixed (was: confirmed) · **File:** `src/algorithms.py:258`
+(now the round-robin's fallback, ~line 292) ·
 **Severity:** correctness (affects regret comparisons involving
 `EpsilonFirst`)
+
+**Fix:** the exploration loop now falls back to
+`cheapest_feasible_arm(env.costs, residual)` (a shared helper, also
+used by `KUBE`/`FractionalKUBE`/`UCB1`) instead of breaking, matching
+the other three algorithms. Verified: instrumenting `env.pull` on the
+exact `costs=[1,1,50]`/`budget=200`/`eps=0.9` scenario below shows the
+round-robin now correctly substitutes cheap arms once the cost-50 arm
+becomes unaffordable, continuing for the full exploration window (53
+total pulls across both phases) instead of terminating after ~11.
 
 `EpsilonFirst.run()`'s exploration-phase loop breaks unconditionally
 when the round-robin arm is unaffordable:
@@ -51,26 +62,29 @@ sub-case is **not reachable** in this repo's actual experiment grid
 grid's minimum is 500 — 20 ≪ 500), so it's a real latent bug but not
 one that's silently corrupted any current results.
 
-**Open question:** what's the intended fix? Two options with
-different implications:
-1. Give `EpsilonFirst`'s exploration phase the same
-   "fall back to cheapest affordable arm" pattern the other three
-   already have (simplest, most consistent with the rest of the
-   codebase).
-2. Something more faithful to the *specific* eps-first baseline
-   definition — worth checking whether the cited "Tran-Thanh et al.
-   2010" eps-first source specifies its own affordability handling,
-   since this baseline's exact behavior may matter for how it's
-   meant to compare against KUBE/Fractional KUBE in Figure 1.
+**Resolved:** went with option 1 (fall back to the cheapest affordable
+arm, matching the other three) — simplest and most consistent with
+the rest of the codebase. Option 2 (checking whether "Tran-Thanh et
+al. 2010" specifies different affordability handling for eps-first
+specifically) was not pursued; worth revisiting if this baseline's
+exact behavior turns out to matter for a specific comparison against
+KUBE/Fractional KUBE.
 
 ---
 
 ## Fractional KUBE's fallback discards its own ranking {#fractional-kube-fallback-discards-ranking}
 
-**Status:** confirmed, scoped to `FractionalKUBE` only (does not
-apply to `KUBE`) · **File:** `src/algorithms.py:141` ·
+**Status:** fixed (was: confirmed, scoped to `FractionalKUBE` only —
+does not apply to `KUBE`) · **File:** `src/algorithms.py:141` ·
 **Severity:** correctness (degrades `FractionalKUBE`'s selection
 quality near budget exhaustion)
+
+**Fix:** restricted the argmax to affordable arms before selecting
+(`affordable = np.where(env.costs <= residual)[0]; arm =
+int(affordable[np.argmax(ucb_density[affordable])])`), matching
+`UCB1`'s existing pattern exactly — this was option 1 from the open
+question below. `KUBE` needed no change (its own selection was
+already correct).
 
 `UCB1` restricts its argmax to affordable arms *before* selecting:
 
@@ -109,20 +123,21 @@ time `KUBE.run()`'s own affordability guard could fire, it's already
 a "shouldn't occur" defensive check (as the code's own comment
 says), not a routinely-hit path the way `FractionalKUBE`'s is.
 
-**Open question:** should the fix restrict `FractionalKUBE`'s argmax
-to affordable arms first (matching `UCB1`'s pattern exactly), or
-should the fallback itself be smarter (pick highest-density among
-feasible, not cheapest)? The former is more consistent with the
-paper's own fractional-relaxation framing (§3.3) — worth checking
-against the paper's exact algorithm statement before changing.
+**Resolved:** went with restricting the argmax to affordable arms
+first (matching `UCB1`'s pattern exactly), rather than making the
+fallback itself smarter — more consistent with the paper's own
+fractional-relaxation framing (§3.3) and with `UCB1`'s already-correct
+approach, and it also means the fallback is now genuinely a rare
+defensive path for `FractionalKUBE` too, not a routinely-hit one.
 
 ---
 
 ## Duplicated `run()` skeleton across KUBE/FractionalKUBE/UCB1 {#duplicated-run-skeleton}
 
-**Status:** confirmed · **File:** `src/algorithms.py:58-203` ·
-**Severity:** maintainability (very likely the root cause of the two
-bugs above)
+**Status:** partially fixed · **File:** `src/algorithms.py:19-40`
+(new shared helpers), used from `KUBE`/`FractionalKUBE`/`UCB1`/
+`EpsilonFirst`'s `run()` methods · **Severity:** maintainability
+(very likely the root cause of the two bugs above)
 
 `KUBE.run()`, `FractionalKUBE.run()`, and `UCB1.run()` each
 re-implement, nearly identically:
@@ -147,12 +162,21 @@ shared base class (e.g. a `_BaseUCBPolicy` with a
 would mean the affordability-fallback bug, at least, could only be
 introduced once, not independently in each subclass.
 
-**Open question:** worth doing this refactor before or after fixing
-the two bugs above? Doing it first would let both fixes land in one
-shared place rather than three; doing it after means the current
-(buggy) behavior is easier to diff against for a "did the fix change
-anything else" sanity check. Lean toward refactor-first, but flagging
-for a decision rather than assuming.
+**Resolved (partially):** extracted three module-level helpers —
+`ucb_values(mu_hat, n, t)`, `update_mean(mu_hat, n, arm, reward)`, and
+`cheapest_feasible_arm(costs, residual)` — used by all four classes.
+This was done alongside the two bug fixes above rather than as a
+separate step, so both fixes land in the shared helpers rather than
+three/four separate call sites. Stopped short of a full base-class
+refactor (a `_BaseUCBPolicy` with a `select_arm` hook) since
+`EpsilonFirst`'s two-phase structure doesn't cleanly fit the same
+template as the other three's single-phase loop — the four `run()`
+methods still each own their own `while` loop and phase structure,
+just no longer duplicate the UCB/fallback/mean-update logic inside
+them. Revisit the full base-class idea if a fifth algorithm is added
+and the remaining duplication (the round-robin init phase, the
+`while env.is_feasible(residual):` loop shape) becomes worth
+factoring out too.
 
 ---
 
