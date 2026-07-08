@@ -1,0 +1,18 @@
+defaults:
+  - exp_schema
+  - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Tiny fast sweep for checking the pipeline runs end-to-end.
+name: smoke
+K: 10
+n_seeds: 3
+regimes: [homogeneous]
+instance_seed: 42
+n_workers: 96

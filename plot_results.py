@@ -1,11 +1,20 @@
 """Plot performance regret / ln(B/c_min), reproducing Figure 1."""
 
-import sys, os, pickle, argparse
+import argparse
+import os
+import pickle
+import sys
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
+
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+)
+from utils import reference_curve
 
 REGIME_TITLES = {
     "homogeneous": "Homogeneous arms",
@@ -14,13 +23,23 @@ REGIME_TITLES = {
 }
 
 ALGO_STYLE = {
-    "KUBE":                 dict(color="blue",   ls="-",  lw=2,   label="KUBE"),
-    "Fractional KUBE":      dict(color="red",    ls="--", lw=2,   label="Fractional KUBE"),
-    "UCB1":                 dict(color="green",  ls="-.", lw=1.5, label="UCB1"),
-    "Random":               dict(color="purple", ls=":",  lw=1.5, label="Random"),
-    "eps-first (eps=0.05)": dict(color="orange", ls="-.", lw=1,   label=r"$\varepsilon$-first (0.05)"),
-    "eps-first (eps=0.1)":  dict(color="brown",  ls="--", lw=1,   label=r"$\varepsilon$-first (0.10)"),
-    "eps-first (eps=0.15)": dict(color="gray",   ls=":",  lw=1,   label=r"$\varepsilon$-first (0.15)"),
+    "KUBE": dict(
+        color="blue", ls="-", lw=2, label="KUBE"),
+    "Fractional KUBE": dict(
+        color="red", ls="--", lw=2, label="Fractional KUBE"),
+    "UCB1": dict(
+        color="green", ls="-.", lw=1.5, label="UCB1"),
+    "Random": dict(
+        color="purple", ls=":", lw=1.5, label="Random"),
+    "eps-first (eps=0.05)": dict(
+        color="orange", ls="-.", lw=1,
+        label=r"$\varepsilon$-first (0.05)"),
+    "eps-first (eps=0.1)": dict(
+        color="brown", ls="--", lw=1,
+        label=r"$\varepsilon$-first (0.10)"),
+    "eps-first (eps=0.15)": dict(
+        color="gray", ls=":", lw=1,
+        label=r"$\varepsilon$-first (0.15)"),
 }
 
 
@@ -42,12 +61,11 @@ def plot(results_path: str, out_dir: str):
 
         algo_data = data["algorithms"]
 
-        # O(B^{2/3} (ln B)^{-1}) reference — scale to match ε-first level
-        ref = budgets**(2/3) / np.log(budgets)
+        # O(B^{2/3} (ln B)^{-1}) reference, scaled to ε-first level
         eps_y = np.array(algo_data.get(
             "eps-first (eps=0.1)", next(iter(algo_data.values()))
         )["regret"]) / log_norm
-        ref = ref / ref[-1] * eps_y[-1] * 1.3
+        ref = reference_curve(budgets, eps_y)
         ax.plot(budgets, ref, color="black", lw=2,
                 label=r"$O(B^{2/3}(\ln B)^{-1})$")
 
@@ -82,7 +100,11 @@ def plot(results_path: str, out_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results", default="../results/results.pkl")
-    parser.add_argument("--out_dir", default="../results")
+    parser.add_argument(
+        "--results", default="results/default.pkl",
+        help="path to a <config_name>.pkl written by run_experiments.py "
+             "(matches the config's 'name' field, e.g. results/smoke.pkl)",
+    )
+    parser.add_argument("--out_dir", default="results")
     args = parser.parse_args()
     plot(args.results, args.out_dir)

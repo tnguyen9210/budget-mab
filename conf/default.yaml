@@ -1,0 +1,20 @@
+defaults:
+  - exp_schema
+  - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Default sweep: reproduces Figure 1 at K=10 (not the paper's K=100 --
+# see docs/issues.md for the deviations from the paper's Section 5
+# setup).
+name: default
+K: 10
+n_seeds: 500
+regimes: [homogeneous, moderate, extreme]
+instance_seed: 42
+n_workers: 96

@@ -134,10 +134,22 @@ defensive path for `FractionalKUBE` too, not a routinely-hit one.
 
 ## Duplicated `run()` skeleton across KUBE/FractionalKUBE/UCB1 {#duplicated-run-skeleton}
 
-**Status:** partially fixed · **File:** `src/algorithms.py:19-40`
-(new shared helpers), used from `KUBE`/`FractionalKUBE`/`UCB1`/
-`EpsilonFirst`'s `run()` methods · **Severity:** maintainability
-(very likely the root cause of the two bugs above)
+**Status:** fixed (was: partially fixed) · **File:**
+`src/algorithms.py` (`_run_ucb_loop`, `ArmStats`, and the shared UCB
+helpers), used from `KUBE`/`FractionalKUBE`/`UCB1`/`EpsilonFirst`'s
+`run()` methods · **Severity:** maintainability (very likely the root
+cause of the two bugs above)
+
+**Update (2026-07-08):** fully resolved — see
+[decisions/ucb-exploration-bonus-scale.md](decisions/ucb-exploration-bonus-scale.md).
+`KUBE.run()`/`FractionalKUBE.run()`/`UCB1.run()` now each call a
+single shared `_run_ucb_loop(env, select_arm, bonus_mode)`, supplying
+only their own `select_arm` callback (the one thing that actually
+differed between them). The round-robin init phase, the affordability
+fallback, and the stats update are now in exactly one place. Verified
+byte-identical regret to the pre-refactor per-class loops. The
+paragraphs below describe the prior (partially-fixed) state, kept for
+history.
 
 `KUBE.run()`, `FractionalKUBE.run()`, and `UCB1.run()` each
 re-implement, nearly identically:
@@ -243,7 +255,13 @@ rather than an implicit dict-order fallback.
 
 ## `env.py` docstring says "TruncGaussian" but implements clipping {#env-truncated-gaussian}
 
-**Status:** plausible, low practical impact · **File:** `src/env.py:41`
+**Status:** fixed · **File:** `src/env.py` (`BudgetMAB.pull`)
+
+**Update:** `pull()` now draws from a true truncated Gaussian via
+`scipy.stats.truncnorm.rvs` (inverse-CDF sampling), not clipping.
+Verified numerically (100k samples: mean/variance match the paper's
+stated `mu_i`/`mu_i/2` spec). The clip-based version below describes
+the prior (now-replaced) implementation, kept for history.
 
 ```python
 raw = self.rng.normal(self.mu_raw[arm], sigma)
