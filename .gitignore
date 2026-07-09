@@ -12,6 +12,4 @@ wheels/
 # Jupyter checkpoints
 .ipynb_checkpoints/
 
-# Generated results (not tracked in this first pass)
-results/
 paper.pdf

@@ -26,7 +26,7 @@ ALGO_STYLE = {
     "KUBE": dict(
         color="blue", ls="-", lw=2, label="KUBE"),
     "Fractional KUBE": dict(
-        color="red", ls="--", lw=2, label="Fractional KUBE"),
+        color="red", ls="--", lw=2, label="Fract KUBE"),
     "UCB1": dict(
         color="green", ls="-.", lw=1.5, label="UCB1"),
     "Random": dict(
@@ -43,7 +43,10 @@ ALGO_STYLE = {
 }
 
 
-def plot(results_path: str, out_dir: str):
+def plot(
+    results_path: str, out_dir: str, exclude=(), suffix: str = "",
+    ylim_auto: bool = False,
+):
     with open(results_path, "rb") as f:
         all_results = pickle.load(f)
 
@@ -69,8 +72,22 @@ def plot(results_path: str, out_dir: str):
         ax.plot(budgets, ref, color="black", lw=2,
                 label=r"$O(B^{2/3}(\ln B)^{-1})$")
 
-        for algo_name, style in ALGO_STYLE.items():
-            if algo_name not in algo_data:
+        for algo_base, style in ALGO_STYLE.items():
+            if algo_base in exclude:
+                continue
+            # ALGO_STYLE is keyed by the bare algo name (e.g. "KUBE");
+            # the pkl's actual keys carry a bonus_mode suffix (e.g.
+            # "KUBE (est_var)") whenever bonus_mode != NONE (the
+            # default since the variance-aware exploration change --
+            # see docs/decisions/ucb-exploration-bonus-scale.md).
+            # Match by prefix so this doesn't silently drop lines
+            # whenever the default bonus_mode changes again.
+            algo_name = next(
+                (k for k in algo_data if k == algo_base
+                 or k.startswith(f"{algo_base} (")),
+                None,
+            )
+            if algo_name is None:
                 continue
             y     = np.array(algo_data[algo_name]["regret"])   / log_norm
             y_err = np.array(algo_data[algo_name]["regret_std"]) / log_norm
@@ -83,8 +100,16 @@ def plot(results_path: str, out_dir: str):
         ax.set_title(REGIME_TITLES.get(regime, regime))
         ax.set_xlabel("Budget size")
         ax.set_ylabel(r"Performance regret / $\ln(B/c_{\min})$")
-        # Cap y-axis at 25 to match paper's scale and show detail
-        ax.set_ylim(bottom=0, top=25)
+        if ylim_auto:
+            # Let this panel scale to its own data -- needed once a
+            # regime's normalized regret exceeds the fixed 25 cap
+            # (e.g. K=100's moderate/extreme regimes). Each panel
+            # gets its own range, so panels are no longer visually
+            # comparable to each other at a glance.
+            ax.set_ylim(bottom=0)
+        else:
+            # Cap y-axis at 25 to match paper's scale and show detail
+            ax.set_ylim(bottom=0, top=25)
         ax.grid(True, alpha=0.3)
 
     handles, labels = axes[-1].get_legend_handles_labels()
@@ -93,7 +118,7 @@ def plot(results_path: str, out_dir: str):
     plt.tight_layout()
 
     for ext in ("pdf", "png"):
-        p = Path(out_dir) / f"figure1.{ext}"
+        p = Path(out_dir) / f"figure1{suffix}.{ext}"
         plt.savefig(p, bbox_inches="tight", dpi=150 if ext == "png" else None)
         print(f"Saved {p}")
 
@@ -106,5 +131,29 @@ if __name__ == "__main__":
              "(matches the config's 'name' field, e.g. results/smoke.pkl)",
     )
     parser.add_argument("--out_dir", default="results")
+    parser.add_argument(
+        "--exclude", nargs="*", default=[],
+        help="ALGO_STYLE base names to omit (e.g. --exclude Random "
+             "UCB1) -- useful when an off-scale baseline is clipped "
+             "by the fixed y-axis cap and hides the algorithms of "
+             "interest in the other lines.",
+    )
+    parser.add_argument(
+        "--suffix", default="",
+        help="appended to the output filename stem, e.g. "
+             "--suffix _no_baselines -> figure1_no_baselines.png/.pdf "
+             "(default: none, writes figure1.png/.pdf as before).",
+    )
+    parser.add_argument(
+        "--ylim-auto", action="store_true",
+        help="let each panel autoscale to its own data instead of "
+             "the fixed 0-25 cap that matches the paper's scale -- "
+             "use when a regime's regret exceeds 25 (e.g. K=100's "
+             "moderate/extreme) and lines would otherwise be clipped "
+             "off-canvas.",
+    )
     args = parser.parse_args()
-    plot(args.results, args.out_dir)
+    plot(
+        args.results, args.out_dir, exclude=args.exclude,
+        suffix=args.suffix, ylim_auto=args.ylim_auto,
+    )
