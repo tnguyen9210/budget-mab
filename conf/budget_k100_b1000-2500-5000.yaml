@@ -1,0 +1,39 @@
+defaults:
+  - exp_schema
+  - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Same as budget_k10_b1000-2500-5000.yaml (all 3 regimes, default
+# 7-algorithm set, n_seeds=500, budgets=[1000,2500,5000]) but at
+# K=100 -- the paper's actual arm count (Section 5), instead of this
+# repo's smaller K=10 default. `name` doubles as the output filename
+# stem (results/<name>.pkl, .json); the figure this produces should
+# be renamed figure1_<name-minus-'budget_'-prefix>.png/.pdf after
+# running plot_results.py, since that script always writes
+# figure1.png/.pdf regardless of input name.
+#
+# Caution: EpsilonFirst's exploration phase is a round-robin over
+# all K arms, budgeted at eps*B. If eps*B < sum(costs) (one full
+# cycle's cost), the round-robin never reaches every arm before
+# switching to exploitation -- it can lock onto a badly-suboptimal
+# arm it happened to see early, producing regret spikes/non-monotonic
+# behavior across budgets that are an artifact of this threshold, not
+# noise. At K=100, sum(costs) is roughly 10x larger than at K=10 (100
+# cost draws vs. 10), so eps=0.05's explore budget (0.05*B) is far
+# more likely to fall short of a full cycle at these budgets than the
+# K=10 config was -- expect this failure mode to show up more often/
+# severely here. Not a bug in EpsilonFirst; a real sensitivity of the
+# fixed eps schedule to K and budget scale.
+name: budget_k100_b1000-2500-5000
+K: 100
+n_seeds: 500
+regimes: [homogeneous, moderate, extreme]
+instance_seed: 42
+n_workers: 96
+budgets: [1000, 2500, 5000]

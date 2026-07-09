@@ -1,0 +1,27 @@
+defaults:
+  - exp_schema
+  - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Same as default.yaml (K=10, all 3 regimes, default 7-algorithm
+# set, n_seeds=500) but at a different budget grid: 5000/7500/10000
+# instead of the hardcoded-default [4000, 10000]. Sibling:
+# budget_k100_b5000-7500-10000.yaml (same setup, K=100 -- the
+# paper's actual arm count). `name` doubles as the output filename
+# stem (results/<name>.pkl, .json); the figure this produces should
+# be renamed figure1_<name-minus-'budget_'-prefix>.png/.pdf after
+# running plot_results.py, since that script always writes
+# figure1.png/.pdf regardless of input name.
+name: budget_k10_b5000-7500-10000
+K: 10
+n_seeds: 500
+regimes: [homogeneous, moderate, extreme]
+instance_seed: 42
+n_workers: 96
+budgets: [5000, 7500, 10000]

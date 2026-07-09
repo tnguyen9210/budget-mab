@@ -13,6 +13,8 @@ Usage (from the repo root, Hydra-style):
     python run_experiments.py --config-name default
     python run_experiments.py --config-name default n_seeds=10
     python run_experiments.py --config-name smoke regimes=[homogeneous]
+    python run_experiments.py --config-name default \
+        budgets=[5000,7500,10000]
 
 Each run writes results/<name>.pkl plus a results/<name>.json
 provenance sidecar (git commit, config used, timestamp) -- see
@@ -239,7 +241,7 @@ def main(cfg: ExpConfig):
             f"{sorted(ALGO_REGISTRY)}"
         ) from e
 
-    budgets = np.array([4000, 10000])
+    budgets = np.array(cfg.budgets)
     run_experiment(
         budgets=budgets,
         algorithms=algorithms,

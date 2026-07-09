@@ -41,3 +41,8 @@ class ExpConfig:
     instance_seed: int = 42
     n_workers: Optional[int] = 1
     results_dir: str = "results"
+    # Budget grid swept per regime. Historically hardcoded in
+    # run_experiments.py's main() as [4000, 10000]; kept as that same
+    # default here so existing configs (which don't set this field)
+    # reproduce identical behavior.
+    budgets: List[float] = field(default_factory=lambda: [4000, 10000])

@@ -1,0 +1,48 @@
+{
+  "config_name": "budget_k100_b1000-2500-5000",
+  "config": {
+    "name": "budget_k100_b1000-2500-5000",
+    "K": 100,
+    "n_seeds": 500,
+    "regimes": [
+      "homogeneous",
+      "moderate",
+      "extreme"
+    ],
+    "algorithms": [
+      "Random",
+      "UCB1 (est_var)",
+      "eps-first (eps=0.05)",
+      "eps-first (eps=0.1)",
+      "eps-first (eps=0.15)",
+      "KUBE (est_var)",
+      "Fractional KUBE (est_var)"
+    ],
+    "instance_seed": 42,
+    "n_workers": 96,
+    "results_dir": "results",
+    "budgets": [
+      1000.0,
+      2500.0,
+      5000.0
+    ]
+  },
+  "git_commit": "a00a147e17d922d2e5c21eb3310d32a11cf36cb5",
+  "timestamp": "2026-07-09T16:20:30",
+  "resolved_params": {
+    "K": 100,
+    "n_seeds": 500,
+    "budgets": [
+      1000.0,
+      2500.0,
+      5000.0
+    ],
+    "regimes": [
+      "homogeneous",
+      "moderate",
+      "extreme"
+    ],
+    "instance_seed": 42,
+    "n_workers": 96
+  }
+}

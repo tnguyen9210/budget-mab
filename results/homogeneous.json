@@ -1,0 +1,44 @@
+{
+  "config_name": "homogeneous",
+  "config": {
+    "name": "homogeneous",
+    "K": 10,
+    "n_seeds": 500,
+    "regimes": [
+      "homogeneous"
+    ],
+    "algorithms": [
+      "Random",
+      "UCB1",
+      "UCB1 (true_var)",
+      "UCB1 (est_var)",
+      "eps-first (eps=0.05)",
+      "eps-first (eps=0.1)",
+      "eps-first (eps=0.15)",
+      "KUBE",
+      "KUBE (true_var)",
+      "KUBE (est_var)",
+      "Fractional KUBE",
+      "Fractional KUBE (true_var)",
+      "Fractional KUBE (est_var)"
+    ],
+    "instance_seed": 42,
+    "n_workers": 96,
+    "results_dir": "results"
+  },
+  "git_commit": "0cba864a8ed2b81f18301a78aeaa92c19f1b6ec2",
+  "timestamp": "2026-07-08T13:22:45",
+  "resolved_params": {
+    "K": 10,
+    "n_seeds": 500,
+    "budgets": [
+      4000,
+      10000
+    ],
+    "regimes": [
+      "homogeneous"
+    ],
+    "instance_seed": 42,
+    "n_workers": 96
+  }
+}
